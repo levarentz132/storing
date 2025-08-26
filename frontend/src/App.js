@@ -1,0 +1,282 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
+import StockPage from './StockPage';
+
+const API_URL = 'http://localhost:3001';
+
+// Add Bootstrap CDN to the document head
+if (typeof document !== 'undefined') {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css';
+  document.head.appendChild(link);
+}
+
+function MainPage() {
+  const [transactionSearch, setTransactionSearch] = useState('');
+  const [transactionFilter, setTransactionFilter] = useState('');
+  const [stockSearch, setStockSearch] = useState('');
+  const [stockFilter, setStockFilter] = useState('');
+  const [items, setItems] = useState([]);
+  const [input, setInput] = useState('');
+  const [action, setAction] = useState('in');
+  const [result, setResult] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [notification, setNotification] = useState('');
+  const [requester, setRequester] = useState('');
+
+  useEffect(() => {
+    fetch(`${API_URL}/stock`)
+      .then(res => res.json())
+      .then(data => setItems(data.data || []));
+    fetch(`${API_URL}/transactions`)
+      .then(res => res.json())
+      .then(data => setTransactions(data.data || []));
+  }, [result]);
+
+  // Add item to cart with duplicate merge and new product notification
+  const handleAddToCart = (e) => {
+    e.preventDefault();
+    setNotification('');
+    const codes = input.split(',').map(code => code.trim()).filter(Boolean);
+    let newCart = [...cart];
+    let newProductCodes = [];
+    codes.forEach(code => {
+      // Find item details from stock
+      const itemDetails = items.find(item => item.item_code === code);
+      const idx = newCart.findIndex(item => item.item_code === code);
+      if (idx !== -1) {
+        // If exists, increment quantity
+        newCart[idx].quantity += 1;
+      } else {
+        if (!itemDetails) {
+          newProductCodes.push(code);
+          newCart.push({ item_code: code, quantity: 1, nama_barang: '-', type: '-' });
+        } else {
+          newCart.push({
+            item_code: code,
+            quantity: 1,
+            nama_barang: itemDetails.nama_barang,
+            type: itemDetails.type
+          });
+        }
+      }
+    });
+    setCart(newCart);
+    setInput('');
+    if (newProductCodes.length > 0) {
+      setNotification(`New product(s) detected: ${newProductCodes.join(', ')}`);
+    }
+  };
+
+  // Submit cart to backend
+  const handleSubmitCart = async () => {
+    if (cart.length === 0 || !requester.trim()) return;
+    const payload = { items: cart, requester };
+    const endpoint = action === 'in' ? '/stock/in' : '/stock/out';
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    // Count successful items
+    const successCount = data.results ? data.results.filter(r => r.status === 'updated' || r.status === 'inserted').length : 0;
+    setResult({ ...data, successCount });
+    setCart([]);
+    setRequester('');
+    // Fetch transactions after submission
+    fetch(`${API_URL}/transactions`)
+      .then(res => res.json())
+      .then(data => setTransactions(data.data || []));
+  };
+
+  return (
+    <div className="container py-4">
+      <h1 className="mb-4">Stock Management</h1>
+      <form onSubmit={handleAddToCart} className="mb-4">
+        <div className="row mb-3">
+          <div className="col-md-3">
+            <label className="form-label">Action:</label>
+            <select value={action} onChange={e => setAction(e.target.value)} className="form-select">
+              <option value="in">IN</option>
+              <option value="out">OUT</option>
+            </select>
+          </div>
+          <div className="col-md-9">
+            <label className="form-label">Scan/Input Item Codes (comma separated):</label>
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              className="form-control"
+              placeholder="e.g. 12345,67890,11223"
+            />
+          </div>
+        </div>
+        <button type="submit" className="btn btn-primary">Add to Cart</button>
+      </form>
+
+      {notification && (
+        <div className="alert alert-warning" role="alert">{notification}</div>
+      )}
+
+      <div className="mb-4">
+        <h3>Cart</h3>
+        {cart.length === 0 ? <div className="text-muted">Cart is empty.</div> : (
+          <table className="table table-bordered">
+            <thead className="table-light">
+              <tr>
+                <th>Item Code</th>
+                <th>Nama Barang</th>
+                <th>Type</th>
+                <th>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cart.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.item_code}</td>
+                  <td>{item.nama_barang}</td>
+                  <td>{item.type}</td>
+                  <td>{item.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div className="mb-2">
+          <label className="form-label">Requester:</label>
+          <input
+            type="text"
+            value={requester}
+            onChange={e => setRequester(e.target.value)}
+            className="form-control"
+            placeholder="Enter requester name"
+          />
+        </div>
+        <button onClick={handleSubmitCart} disabled={cart.length === 0 || !requester.trim()} className="btn btn-success mt-2">Submit Cart</button>
+      </div>
+
+      {result && (
+        <div className="mb-4">
+          <h3>Result</h3>
+          <div className="mb-2">Successfully processed: <b>{result.successCount}</b> item(s)</div>
+          {result.results && result.results.length > 0 ? (
+            <table className="table table-bordered">
+              <thead className="table-light">
+                <tr>
+                  <th>Item Code</th>
+                  <th>Status</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.results.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.item_code}</td>
+                    <td>{r.status === 'updated' ? 'Updated' : r.status === 'inserted' ? 'Inserted' : 'Error'}</td>
+                    <td>{r.error ? (typeof r.error === 'object' ? r.error.message : r.error) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-muted">No result data.</div>
+          )}
+        </div>
+      )}
+
+      {/* Stock Transactions Section */}
+      <h2 className="mt-5">Stock Transactions</h2>
+      <div className="row mb-2">
+        <div className="col-md-6">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search transactions (item code, nama_barang, requester...)"
+            value={transactionSearch}
+            onChange={e => setTransactionSearch(e.target.value)}
+          />
+        </div>
+        <div className="col-md-3">
+          <select className="form-select" value={transactionFilter} onChange={e => setTransactionFilter(e.target.value)}>
+            <option value="">All Actions</option>
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+          </select>
+        </div>
+      </div>
+      {transactions.length === 0 ? (
+        <div className="text-muted">No transactions found.</div>
+      ) : (
+        <table className="table table-bordered">
+          <thead className="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Action</th>
+              <th>Requester</th>
+              <th>Items</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions
+              .filter(tx =>
+                (!transactionFilter || tx.action === transactionFilter) &&
+                (
+                  transactionSearch === '' ||
+                  tx.requester?.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+                  (Array.isArray(tx.items) && tx.items.some(item =>
+                    (item.item_code && item.item_code.toLowerCase().includes(transactionSearch.toLowerCase())) ||
+                    (item.nama_barang && item.nama_barang.toLowerCase().includes(transactionSearch.toLowerCase()))
+                  ))
+                )
+              )
+              .map((tx, idx) => (
+                <tr key={tx.id || idx}>
+                  <td>{tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '-'}</td>
+                  <td>{tx.action}</td>
+                  <td>{tx.requester || '-'}</td>
+                  <td>
+                    {Array.isArray(tx.items) ? (
+                      <ul className="mb-0">
+                        {tx.items.map((item, i) => (
+                          <li key={i}>
+                            <b>{item.item_code}</b> ({item.quantity})<br />
+                            {item.nama_barang && <span>Nama Barang: {item.nama_barang}<br /></span>}
+                            {item.type && <span>Type: {item.type}<br /></span>}
+                            {Object.entries(item).map(([key, value]) => (
+                              typeof value === 'string' && !['item_code','nama_barang','type'].includes(key) ? (
+                                <span key={key}>{key}: {value}<br /></span>
+                              ) : null
+                            ))}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : '-' }
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+      <div className="mt-4">
+        <Link to="/stock" className="btn btn-secondary">View Current Stock</Link>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainPage />} />
+        <Route path="/stock" element={<StockPage />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
