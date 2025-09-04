@@ -132,6 +132,8 @@ function MainPage() {
                 <th>Nama Barang</th>
                 <th>Type</th>
                 <th>Quantity</th>
+                <th>Edit</th>
+                <th>Delete</th>
               </tr>
             </thead>
             <tbody>
@@ -140,7 +142,31 @@ function MainPage() {
                   <td>{item.item_code}</td>
                   <td>{item.nama_barang}</td>
                   <td>{item.type}</td>
-                  <td>{item.quantity}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      style={{ width: '70px' }}
+                      onChange={e => {
+                        const val = Math.max(1, Number(e.target.value));
+                        setCart(cart.map((c, i) => i === idx ? { ...c, quantity: val } : c));
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <button className="btn btn-sm btn-warning" onClick={() => {
+                      const val = prompt('Enter new quantity:', item.quantity);
+                      if (val !== null && !isNaN(val) && Number(val) > 0) {
+                        setCart(cart.map((c, i) => i === idx ? { ...c, quantity: Number(val) } : c));
+                      }
+                    }}>Edit</button>
+                  </td>
+                  <td>
+                    <button className="btn btn-sm btn-danger" onClick={() => {
+                      setCart(cart.filter((_, i) => i !== idx));
+                    }}>Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
