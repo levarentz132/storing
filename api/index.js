@@ -14,6 +14,37 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+app.post('/stock', async (req, res) => {
+  const { item_code, nama_barang, type, quantity } = req.body;
+  if (!item_code || !nama_barang || !type || quantity === undefined) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  const { data, error } = await supabase
+    .from('stock_items')
+    .insert([{ item_code, nama_barang, type, quantity }]);
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ data });
+});
+
+// Edit/update a stock item
+app.put('/stock/:item_code', async (req, res) => {
+  const { item_code } = req.params;
+  const { nama_barang, type, quantity } = req.body;
+  if (!nama_barang || !type || quantity === undefined) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  const { data, error } = await supabase
+    .from('stock_items')
+    .update({ nama_barang, type, quantity, updated_at: new Date().toISOString() })
+    .eq('item_code', item_code)
+    .select();
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ data });
+});
 // IN endpoint
 app.post('/stock/in', async (req, res) => {
   const { items, requester } = req.body; // items: [{ item_code, nama_barang, type, satuan, stok, quantity }], requester: string
