@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
@@ -13,7 +12,38 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
-
+// Edit requester of a stock transaction by id
+app.put('/transactions/:id', async (req, res) => {
+  const { id } = req.params;
+  const { requester } = req.body;
+  if (!id || !requester) {
+    return res.status(400).json({ error: 'Missing id or requester' });
+  }
+  const { data, error } = await supabase
+    .from('stock_transactions')
+    .update({ requester })
+    .eq('id', id)
+    .select();
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ data });
+});
+// Delete a stock transaction by id
+app.delete('/transactions/:id', async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing transaction id' });
+  }
+  const { error } = await supabase
+    .from('stock_transactions')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ success: true });
+});
 app.post('/stock', async (req, res) => {
   const { item_code, nama_barang, type, quantity } = req.body;
   if (!item_code || !nama_barang || !type || quantity === undefined) {

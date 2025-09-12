@@ -13,6 +13,36 @@ if (typeof document !== 'undefined') {
 }
 
 function MainPage() {
+  // Transaction edit/delete state and handlers
+  const [showEditTransactionModal, setShowEditTransactionModal] = useState(false);
+  const [editTransaction, setEditTransaction] = useState(null);
+  const [editTransactionRequester, setEditTransactionRequester] = useState('');
+
+  const handleEditTransaction = (tx) => {
+    setEditTransaction(tx);
+    setEditTransactionRequester(tx.requester || '');
+    setShowEditTransactionModal(true);
+  };
+
+  const handleEditTransactionSubmit = async (e) => {
+    e.preventDefault();
+    if (!editTransaction) return;
+    await fetch(`${API_URL}/transactions/${editTransaction.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requester: editTransactionRequester }),
+    });
+    setShowEditTransactionModal(false);
+    // Refresh transactions
+    fetch(`${API_URL}/transactions`).then(res => res.json()).then(data => setTransactions(data.data || []));
+  };
+
+  const handleDeleteTransaction = async (tx) => {
+    if (!window.confirm('Delete this transaction?')) return;
+    await fetch(`${API_URL}/transactions/${tx.id}`, { method: 'DELETE' });
+    // Refresh transactions
+    fetch(`${API_URL}/transactions`).then(res => res.json()).then(data => setTransactions(data.data || []));
+  };
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionFilter, setTransactionFilter] = useState('');
   const [stockSearch, setStockSearch] = useState('');
@@ -237,6 +267,7 @@ function MainPage() {
       {transactions.length === 0 ? (
         <div className="text-muted">No transactions found.</div>
       ) : (
+        <>
         <table className="table table-bordered">
           <thead className="table-light">
             <tr>
@@ -244,6 +275,8 @@ function MainPage() {
               <th>Action</th>
               <th>Requester</th>
               <th>Items</th>
+              <th>Edit</th>
+              <th>Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -282,10 +315,39 @@ function MainPage() {
                       </ul>
                     ) : '-' }
                   </td>
+                  <td>
+                    <button className="btn btn-sm btn-warning" onClick={() => handleEditTransaction(tx)}>Edit</button>
+                  </td>
+                  <td>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteTransaction(tx)}>Delete</button>
+                  </td>
                 </tr>
               ))}
           </tbody>
         </table>
+        {/* Edit Transaction Modal */}
+        {showEditTransactionModal && (
+          <div className="modal show d-block" tabIndex="-1" style={{ background: 'rgba(0,0,0,0.3)' }}>
+            <div className="modal-dialog">
+              <form onSubmit={handleEditTransactionSubmit}>
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">Edit Requester</h5>
+                    <button type="button" className="btn-close" onClick={() => setShowEditTransactionModal(false)}></button>
+                  </div>
+                  <div className="modal-body">
+                    <input className="form-control mb-2" name="requester" value={editTransactionRequester} onChange={e => setEditTransactionRequester(e.target.value)} placeholder="Requester" required />
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowEditTransactionModal(false)}>Cancel</button>
+                    <button type="submit" className="btn btn-primary">Save</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        </>
       )}
       <div className="mt-4">
         <Link to="/stock" className="btn btn-secondary">View Current Stock</Link>
