@@ -48,6 +48,12 @@ function MainPage() {
   const [stockSearch, setStockSearch] = useState('');
   const [stockFilter, setStockFilter] = useState('');
   const [items, setItems] = useState([]);
+  // Manual nama_barang search state
+  const [manualNama, setManualNama] = useState('');
+  const [manualType, setManualType] = useState('');
+  const [manualResults, setManualResults] = useState([]);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState('');
   const [input, setInput] = useState('');
   const [action, setAction] = useState('in');
   const [result, setResult] = useState(null);
@@ -64,6 +70,47 @@ function MainPage() {
       .then(res => res.json())
       .then(data => setTransactions(data.data || []));
   }, [result]);
+
+  // Debounced manual search effect (runs when name OR type changes)
+  useEffect(() => {
+    // If both fields empty, clear results and skip
+    if ((!manualNama || manualNama.trim() === '') && (!manualType || manualType.trim() === '')) {
+      setManualResults([]);
+      setManualError('');
+      return;
+    }
+    setManualLoading(true);
+    setManualError('');
+    const t = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (manualNama) params.append('nama_barang', manualNama);
+      if (manualType) params.append('type', manualType);
+      fetch(`${API_URL}/stock/search?${params.toString()}`)
+        .then(r => r.json())
+        .then(d => {
+          setManualResults(d.data || []);
+          setManualLoading(false);
+        })
+        .catch(err => {
+          setManualError('Search failed');
+          setManualLoading(false);
+        });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [manualNama, manualType]);
+
+  // Add manual result to cart
+  const handleAddManualToCart = (item) => {
+    setCart(prev => {
+      const idx = prev.findIndex(p => p.item_code === item.item_code);
+      if (idx !== -1) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], quantity: Number(copy[idx].quantity) + 1, nama_barang: item.nama_barang || copy[idx].nama_barang, type: item.type || copy[idx].type };
+        return copy;
+      }
+      return [...prev, { item_code: item.item_code, nama_barang: item.nama_barang || '-', type: item.type || '-', quantity: 1 }];
+    });
+  };
 
   // Add item to cart with duplicate merge and new product notification
   const handleAddToCart = (e) => {
@@ -124,8 +171,38 @@ function MainPage() {
 
   return (
     <div className="container py-4">
-      <h1 className="mb-4">Stock Management</h1>
-      <form onSubmit={handleAddToCart} className="mb-4">
+        <h1 className="mb-4">Stock Management</h1>
+
+        {/* Manual nama_barang search */}
+        <div className="mb-4 p-3 border rounded bg-light">
+          <h5>Search product by Nama Barang</h5>
+          <div className="row g-2">
+            <div className="col-md-6">
+              <input className="form-control" placeholder="Type product name..." value={manualNama} onChange={e => setManualNama(e.target.value)} />
+            </div>
+            <div className="col-md-3">
+              <input className="form-control" placeholder="Type (optional)" value={manualType} onChange={e => setManualType(e.target.value)} />
+            </div>
+            <div className="col-md-3 text-end">
+              {manualLoading ? <span className="text-muted">Searching...</span> : manualError ? <span className="text-danger">{manualError}</span> : null}
+            </div>
+          </div>
+          {manualResults.length > 0 && (
+            <ul className="list-group mt-2">
+              {manualResults.map(r => (
+                <li key={r.item_code} className="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>{r.nama_barang}</strong> <small className="text-muted">[{r.item_code}]</small>
+                    {r.type && <div className="text-muted small">{r.type}</div>}
+                  </div>
+                  <button className="btn btn-sm btn-success" onClick={() => handleAddManualToCart(r)}>Add to Cart</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <form onSubmit={handleAddToCart} className="mb-4">
         <div className="row mb-3">
           <div className="col-md-3">
             <label className="form-label">Action:</label>

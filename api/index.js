@@ -1,3 +1,4 @@
+
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
@@ -12,6 +13,18 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
+app.get('/stock/search', async (req, res) => {
+  const { nama_barang, type } = req.query;
+  let query = supabase.from('stock_items').select('*');
+  if (nama_barang) {
+    query = query.ilike('nama_barang', `%${nama_barang}%`);
+  }
+  if (type) {
+    query = query.ilike('type', `%${type}%`);
+  }
+  const { data, error } = await query;
+  res.json({ data, error });
+});
 // Edit requester of a stock transaction by id
 app.put('/transactions/:id', async (req, res) => {
   const { id } = req.params;
