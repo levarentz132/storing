@@ -107,7 +107,7 @@ function StockPage() {
                 <td>{item.type}</td>
                 <td>{item.quantity}</td>
                 <td>
-                  <button className="btn btn-sm btn-warning" onClick={() => handleEditClick(item)}>Edit</button>
+                  <button className="btn btn-sm btn-warning" disabled onClick={() => handleEditClick(item)}>Edit</button>
                 </td>
               </tr>
             ))}
